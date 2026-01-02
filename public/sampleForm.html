@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Book Appointment - 32Dental Avenue</title>
+</head>
+<body>
+  <h1>Book Appointment (demo)</h1>
+  <form id="bookingForm">
+    <input placeholder="First name" name="firstName" required /><br/>
+    <input placeholder="Last name" name="lastName" required /><br/>
+    <input type="email" placeholder="Email" name="email" required /><br/>
+    <input placeholder="Phone" name="phone" required /><br/>
+    <input placeholder="Location" name="location" /><br/>
+    <input type="datetime-local" name="date" required /><br/>
+    <button type="submit">Book</button>
+  </form>
+  <pre id="result"></pre>
+  <script>
+    document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        firstName: form.firstName.value,
+        lastName: form.lastName.value,
+        email: form.email.value,
+        phone: form.phone.value,
+        location: form.location.value,
+        date: form.date.value
+      };
+
+      // If the page is served from Live Server (port 5500), target the local backend at port 3000.
+      const apiBase = (location.port === '5500') ? 'http://localhost:3000' : '';
+
+      try {
+        const res = await fetch(apiBase + '/api/bookings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || `${res.status} ${res.statusText}`);
+        }
+
+        const json = await res.json();
+        document.getElementById('result').textContent = JSON.stringify(json, null, 2);
+      } catch (err) {
+        document.getElementById('result').textContent = 'Error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

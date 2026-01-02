@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Admin - Bookings</title>
+</head>
+<body>
+  <h1>Admin Panel (demo)</h1>
+  <form id="loginForm">
+    <input placeholder="Email" name="email" value="demo@admin" required /><br/>
+    <input placeholder="Password" name="password" value="demo1234" required /><br/>
+    <button>Login</button>
+  </form>
+  <div id="panel" style="display:none;">
+    <h2>Bookings</h2>
+    <table border="1" id="bookingsTable">
+      <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Date</th><th>Location</th><th>CreatedAt</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button id="logout">Logout</button>
+  </div>
+
+  <script>
+    const loginForm = document.getElementById('loginForm');
+    const panel = document.getElementById('panel');
+    let token = null;
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email: loginForm.email.value, password: loginForm.password.value }) });
+      const json = await res.json();
+      if (json.token) {
+        token = json.token;
+        localStorage.setItem('adminToken', token);
+        loginForm.style.display = 'none';
+        panel.style.display = 'block';
+        fetchBookings();
+      } else {
+        alert('Login failed');
+      }
+    });
+
+    async function fetchBookings() {
+      const res = await fetch('/api/bookings', { headers: { 'Authorization': 'Bearer ' + (token || localStorage.getItem('adminToken')) } });
+      if (res.status === 401) return alert('Unauthorized');
+      const json = await res.json();
+      const tbody = document.querySelector('#bookingsTable tbody');
+      tbody.innerHTML = '';
+      (json.bookings || []).forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${b.id}</td><td>${b.firstName} ${b.lastName}</td><td>${b.email}</td><td>${b.phone}</td><td>${b.bookingDate}</td><td>${b.location}</td><td>${b.createdAt}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('adminToken');
+      token = null;
+      panel.style.display = 'none';
+      loginForm.style.display = 'block';
+    });
+
+    // Try auto-login
+    (function(){ const t = localStorage.getItem('adminToken'); if (t) { token = t; loginForm.style.display='none'; panel.style.display='block'; fetchBookings(); } })();
+  </script>
+</body>
+</html>
