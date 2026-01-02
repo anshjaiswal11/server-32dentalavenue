@@ -1,11 +1,12 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/*.js", "use": "@vercel/node" }
+    { "src": "api/**/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/", "dest": "/api/health" },
-    { "src": "/api/booking", "dest": "/api/bookings" },
-    { "src": "/health", "dest": "/api/health" }
+    { "src": "^/$", "dest": "/api/health.js" },
+    { "src": "^/health$", "dest": "/api/health.js" },
+    { "src": "^/api/booking$", "dest": "/api/bookings.js" },
+    { "src": "^/api/login$", "dest": "/api/login.js" }
   ]
 }
