@@ -20,11 +20,10 @@ function createTransport() {
 }
 
 // Vercel serverless handler
+const _cors = require('./_cors');
 module.exports = async (req, res) => {
   // CORS: allow cross-origin requests (dev server on 127.0.0.1:5500 or any allowed origin)
-  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  _cors(res);
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
