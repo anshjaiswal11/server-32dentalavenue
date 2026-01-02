@@ -30,7 +30,7 @@
       };
 
       // If the page is served from Live Server (port 5500), target the local backend at port 3000.
-      const apiBase = (location.port === '5500') ? 'http://127.0.0.1:3000' : '';
+      const apiBase = (location.port === '5500') ? 'https://server-32dentalavenue-kappa.vercel.app' : '';
 
       try {
         const res = await fetch(apiBase + '/api/bookings', {

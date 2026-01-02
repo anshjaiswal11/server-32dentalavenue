@@ -6,6 +6,12 @@ const DEMO_EMAIL = process.env.DEMO_ADMIN_EMAIL || 'demo@admin';
 const DEMO_PASSWORD = process.env.DEMO_ADMIN_PASS || 'demo1234';
 
 module.exports = async (req, res) => {
+  // CORS for browsers
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Missing credentials' });
