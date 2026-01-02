@@ -4,8 +4,7 @@
     { "src": "api/*.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/admin", "dest": "/public/admin.html" },
-    { "src": "/book", "dest": "/public/sampleForm.html" },
+    { "src": "/", "dest": "/api/health" },
     { "src": "/api/booking", "dest": "/api/bookings" },
     { "src": "/health", "dest": "/api/health" }
   ]
