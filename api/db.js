@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/dental';
+// Read and sanitize MONGODB_URI (trim and remove surrounding quotes if provided in env)
+let MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://32detalavenue:<db_password>@32dentalbooking.uxym2bu.mongodb.net/?appName=32dentalbooking';
+if (typeof MONGODB_URI === 'string') {
+  MONGODB_URI = MONGODB_URI.trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+}
 
 let isConnected = false;
 
