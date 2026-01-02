@@ -29,7 +29,13 @@ module.exports = async (req, res) => {
   }
 
   try {
-    await connect(); // ensure DB is connected
+    try {
+      await connect(); // ensure DB is connected
+    } catch (err) {
+      console.error('DB connection failed', err && err.stack ? err.stack : err);
+      const dbMsg = process.env.NODE_ENV === 'production' ? 'Database unavailable' : (err && err.message ? err.message : 'Database connection failed');
+      return res.status(503).json({ error: dbMsg });
+    }
 
     if (req.method === 'POST') {
       const { firstName, lastName, email, phone, location, date } = req.body || {};
@@ -39,7 +45,14 @@ module.exports = async (req, res) => {
 
       const bookingDate = new Date(date);
       if (isNaN(bookingDate.getTime())) return res.status(400).json({ error: 'Invalid booking date' });
-      const newBooking = await Booking.create({ firstName, lastName, email, phone, location: location || '', bookingDate });
+      let newBooking;
+      try {
+        newBooking = await Booking.create({ firstName, lastName, email, phone, location: location || '', bookingDate });
+      } catch (err) {
+        console.error('DB write failed', err && err.stack ? err.stack : err);
+        const dbMsg = process.env.NODE_ENV === 'production' ? 'Database write failed' : (err && err.message ? err.message : 'Database write failed');
+        return res.status(503).json({ error: dbMsg });
+      }
 
       // Send confirmation email to user (non-fatal - log errors but still return success)
       const smtpConfigured = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
