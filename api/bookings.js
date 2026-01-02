@@ -21,6 +21,14 @@ function createTransport() {
 
 // Vercel serverless handler
 module.exports = async (req, res) => {
+  // CORS: allow cross-origin requests (dev server on 127.0.0.1:5500 or any allowed origin)
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   try {
     await connect(); // ensure DB is connected
 
@@ -97,7 +105,7 @@ module.exports = async (req, res) => {
       return res.json({ bookings: rows });
     }
 
-    res.setHeader('Allow', 'GET, POST');
+    res.setHeader('Allow', 'GET, POST, OPTIONS');
     res.status(405).end('Method Not Allowed');
   } catch (err) {
     console.error('Bookings error', err && err.stack ? err.stack : err);
