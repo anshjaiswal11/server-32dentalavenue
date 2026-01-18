@@ -6,6 +6,7 @@ const cors = require('cors');
 const { connect } = require('./api/db');
 const bookingsHandler = require('./api/bookings');
 const loginHandler = require('./api/login');
+const blogsRouter = require('./api/blogs');
 
 const app = express();
 app.use(cors());
@@ -47,6 +48,8 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+app.use('/api/blogs', blogsRouter);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
