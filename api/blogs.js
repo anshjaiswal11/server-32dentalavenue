@@ -1,10 +1,14 @@
 const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
+const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const router = express.Router();
+const app = express();
+
+// Enable CORS for this handler
+app.use(cors());
 
 // Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -31,8 +35,11 @@ const createSlug = (title) => {
         .replace(/(^-|-$)+/g, '');
 };
 
+// Routes are defined directly on 'app' or a router mounted at root '/'
+// Because vercel rewrites /api/blogs -> api/blogs.js, the request path reaching here will appear as '/' or '/slug/...' if we mount at root.
+
 // GET / - List all blogs
-router.get('/', async (req, res) => {
+app.get('/', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('blogs')
@@ -48,25 +55,9 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET /:id - Get single blog
-router.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { data, error } = await supabase
-            .from('blogs')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        if (error) throw error;
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ message: "Failed to fetch blog", error: err.message });
-    }
-});
-
 // GET /slug/:slug - Get single blog by slug (Public)
-router.get('/slug/:slug', async (req, res) => {
+// IMPORTANT: Place this BEFORE /:id to avoid "slug" being interpreted as an ID
+app.get('/slug/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
         const { data, error } = await supabase
@@ -82,8 +73,25 @@ router.get('/slug/:slug', async (req, res) => {
     }
 });
 
+// GET /:id - Get single blog
+app.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { data, error } = await supabase
+            .from('blogs')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ message: "Failed to fetch blog", error: err.message });
+    }
+});
+
 // POST / - Create a new blog with image
-router.post('/', upload.single('image'), async (req, res) => {
+app.post('/', upload.single('image'), async (req, res) => {
     try {
         const { title, content, meta_title, meta_description, slug: providedSlug } = req.body;
         const file = req.file;
@@ -144,7 +152,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 });
 
 // PUT /:id - Update a blog
-router.put('/:id', upload.single('image'), async (req, res) => {
+app.put('/:id', upload.single('image'), async (req, res) => {
     try {
         const { id } = req.params;
         const { title, content, meta_title, meta_description, slug, image_url: existingImageUrl } = req.body;
@@ -200,7 +208,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 });
 
 // DELETE /:id - Delete a blog
-router.delete('/:id', async (req, res) => {
+app.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -219,4 +227,4 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-module.exports = router;
+module.exports = app;

@@ -1,12 +1,31 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/**/*.js", "use": "@vercel/node" }
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
   ],
   "routes": [
-    { "src": "^/$", "dest": "/api/health.js" },
-    { "src": "^/api/booking$", "dest": "/api/bookings.js" },
-    { "src": "^/api/health$", "dest": "/api/health.js" },
-    { "src": "^/api/(.*)$", "dest": "/api/$1.js" }
+    {
+      "src": "^/$",
+      "dest": "/api/health.js"
+    },
+    {
+      "src": "^/api/booking$",
+      "dest": "/api/bookings.js"
+    },
+    {
+      "src": "^/api/health$",
+      "dest": "/api/health.js"
+    },
+    {
+      "src": "^/api/blogs(?:/(.*))?$",
+      "dest": "/api/blogs.js"
+    },
+    {
+      "src": "^/api/(.*)$",
+      "dest": "/api/$1.js"
+    }
   ]
 }
