@@ -3,10 +3,10 @@ const mongoose = require('mongoose');
 // Read and sanitize MONGODB_URI (trim and remove surrounding quotes if provided in env)
 // Hardcoded MongoDB URI (User requested)
 // REPLACE <password> with your actual password
-const HARDCODED_URI = 'mongodb+srv://32detalavenue:32Dentalavenuebooking@32dentalbooking.uxym2bu.mongodb.net/?appName=32dentalbooking';
+// const HARDCODED_URI = 'mongodb+srv://32detalavenue:32Dentalavenuebooking@32dentalbooking.uxym2bu.mongodb.net/?appName=32dentalbooking';
 
 // Read MONGODB_URI (prefer env, fallback to hardcoded)
-let MONGODB_URI = process.env.MONGODB_URI || HARDCODED_URI;
+let MONGODB_URI = process.env.MONGODB_URI;
 
 // Sanitize if string
 if (typeof MONGODB_URI === 'string') {
