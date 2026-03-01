@@ -21,16 +21,18 @@ async function connect() {
   }
 
   // Warn if using placeholder
-  if (MONGODB_URI.includes('<password>')) {
-    console.error('ERROR: MONGODB_URI contains "<password>" placeholder. Please update api/db.js with the real password.');
-  }
-
+  // Ensure MONGODB_URI is provided before calling string methods
   if (!MONGODB_URI) {
     throw new Error('MONGODB_URI environment variable is not defined and no hardcoded URI found.');
   }
 
+  // Warn if using placeholder
+  if (typeof MONGODB_URI === 'string' && MONGODB_URI.includes('<password>')) {
+    console.error('ERROR: MONGODB_URI contains "<password>" placeholder. Please update api/db.js with the real password.');
+  }
+
   // On Vercel (serverless), local IPs won't work.
-  if ((MONGODB_URI.includes('127.0.0.1') || MONGODB_URI.includes('localhost')) && process.env.VERCEL === '1') {
+  if (typeof MONGODB_URI === 'string' && (MONGODB_URI.includes('127.0.0.1') || MONGODB_URI.includes('localhost')) && process.env.VERCEL === '1') {
     throw new Error('MONGODB_URI cannot be localhost in Vercel deployment. Please use a MongoDB Atlas URI.');
   }
 
