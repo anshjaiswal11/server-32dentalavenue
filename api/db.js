@@ -1,5 +1,18 @@
 const mongoose = require('mongoose');
 
+// Read and sanitize MONGODB_URI (trim and remove surrounding quotes if provided in env)
+// Hardcoded MongoDB URI (User requested)
+// REPLACE <password> with your actual password
+// const HARDCODED_URI = 'mongodb+srv://32detalavenue:32Dentalavenuebooking@32dentalbooking.uxym2bu.mongodb.net/?appName=32dentalbooking';
+
+// Read MONGODB_URI (prefer env, fallback to hardcoded)
+let MONGODB_URI = process.env.MONGODB_URI;
+
+// Sanitize if string
+if (typeof MONGODB_URI === 'string') {
+  MONGODB_URI = MONGODB_URI.trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+}
+
 let isConnected = false;
 
 async function connect() {
@@ -8,16 +21,8 @@ async function connect() {
     return mongoose;
   }
 
-  // ✅ Get and sanitize URI
-  let MONGODB_URI = process.env.MONGODB_URI;
-
-  if (typeof MONGODB_URI === 'string') {
-    MONGODB_URI = MONGODB_URI.trim()
-      .replace(/^"(.*)"$/, '$1')
-      .replace(/^'(.*)'$/, '$1');
-  }
-
-  // ✅ Validate BEFORE doing anything else
+  // Warn if using placeholder
+  // Ensure MONGODB_URI is provided before calling string methods
   if (!MONGODB_URI) {
     throw new Error('MONGODB_URI environment variable is not set. Add it in Vercel → Settings → Environment Variables.');
   }
@@ -26,8 +31,14 @@ async function connect() {
     throw new Error('MONGODB_URI still contains the <password> placeholder. Replace it with your real password.');
   }
 
-  if ((MONGODB_URI.includes('127.0.0.1') || MONGODB_URI.includes('localhost')) && process.env.VERCEL === '1') {
-    throw new Error('MONGODB_URI cannot be localhost on Vercel. Use a MongoDB Atlas URI.');
+  // Warn if using placeholder
+  if (typeof MONGODB_URI === 'string' && MONGODB_URI.includes('<password>')) {
+    console.error('ERROR: MONGODB_URI contains "<password>" placeholder. Please update api/db.js with the real password.');
+  }
+
+  // On Vercel (serverless), local IPs won't work.
+  if (typeof MONGODB_URI === 'string' && (MONGODB_URI.includes('127.0.0.1') || MONGODB_URI.includes('localhost')) && process.env.VERCEL === '1') {
+    throw new Error('MONGODB_URI cannot be localhost in Vercel deployment. Please use a MongoDB Atlas URI.');
   }
 
   try {

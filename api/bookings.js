@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
 function createTransport() {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST, 
+    host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: process.env.SMTP_SECURE === 'true',
     auth: {
@@ -23,7 +23,7 @@ function createTransport() {
 const _cors = require('./_cors');
 module.exports = async (req, res) => {
   // CORS: allow cross-origin requests (dev server on 127.0.0.1:5500 or any allowed origin)
-  _cors(res);
+  _cors(req, res);
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }

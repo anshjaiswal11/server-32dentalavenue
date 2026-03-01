@@ -2,7 +2,7 @@ const _cors = require('./_cors');
 const { connect } = require('./db');
 
 module.exports = async (req, res) => {
-  _cors(res);
+  _cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).end('Method Not Allowed');
 
