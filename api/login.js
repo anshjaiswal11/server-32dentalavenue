@@ -8,7 +8,7 @@ const DEMO_PASSWORD = process.env.DEMO_ADMIN_PASS || 'demo1234';
 const _cors = require('./_cors');
 module.exports = async (req, res) => {
   // CORS for browsers
-  _cors(res);
+  _cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');

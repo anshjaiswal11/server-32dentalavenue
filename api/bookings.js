@@ -23,7 +23,7 @@ function createTransport() {
 const _cors = require('./_cors');
 module.exports = async (req, res) => {
   // CORS: allow cross-origin requests (dev server on 127.0.0.1:5500 or any allowed origin)
-  _cors(res);
+  _cors(req, res);
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
