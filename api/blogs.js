@@ -149,24 +149,31 @@ router.post('/', upload.single('image'), async (req, res) => {
         let imageUrl = null;
 
         if (file) {
-            const compressedImageBuffer = await sharp(file.buffer)
-                .resize({ width: 1200, withoutEnlargement: true })
-                .jpeg({ quality: 80 })
-                .toBuffer();
+            try {
+                const compressedImageBuffer = await sharp(file.buffer)
+                    .resize({ width: 1200, withoutEnlargement: true })
+                    .jpeg({ quality: 80 })
+                    .toBuffer();
 
-            const filename = `blog_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                const filename = `blog_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('images')
-                .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
+                const { error: uploadError } = await supabase.storage
+                    .from('images')
+                    .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
 
-            if (uploadError) throw uploadError;
-
-            const { data: publicUrlData } = supabase.storage
-                .from('images')
-                .getPublicUrl(filename);
-
-            imageUrl = publicUrlData.publicUrl;
+                if (uploadError) {
+                    // Log and continue without failing the whole request
+                    console.error('Supabase storage upload failed, continuing without image:', uploadError);
+                } else {
+                    const { data: publicUrlData } = await supabase.storage
+                        .from('images')
+                        .getPublicUrl(filename);
+                    imageUrl = publicUrlData && publicUrlData.publicUrl ? publicUrlData.publicUrl : null;
+                }
+            } catch (uploadErr) {
+                console.error('Image processing/upload error (non-fatal):', uploadErr && (uploadErr.stack || uploadErr.message || uploadErr));
+                // don't throw; allow blog creation without image
+            }
         }
 
         const slug = providedSlug && providedSlug.trim() !== '' ? providedSlug : createSlug(title);
@@ -204,24 +211,29 @@ router.put('/:id', upload.single('image'), async (req, res) => {
         let imageUrl = existingImageUrl;
 
         if (file) {
-            const compressedImageBuffer = await sharp(file.buffer)
-                .resize({ width: 1200, withoutEnlargement: true })
-                .jpeg({ quality: 80 })
-                .toBuffer();
+            try {
+                const compressedImageBuffer = await sharp(file.buffer)
+                    .resize({ width: 1200, withoutEnlargement: true })
+                    .jpeg({ quality: 80 })
+                    .toBuffer();
 
-            const filename = `blog_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                const filename = `blog_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
 
-            const { error: uploadError } = await supabase.storage
-                .from('images')
-                .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
+                const { error: uploadError } = await supabase.storage
+                    .from('images')
+                    .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
 
-            if (uploadError) throw uploadError;
-
-            const { data: publicUrlData } = supabase.storage
-                .from('images')
-                .getPublicUrl(filename);
-
-            imageUrl = publicUrlData.publicUrl;
+                if (uploadError) {
+                    console.error('Supabase storage upload failed during update, continuing without updating image:', uploadError);
+                } else {
+                    const { data: publicUrlData } = await supabase.storage
+                        .from('images')
+                        .getPublicUrl(filename);
+                    imageUrl = publicUrlData && publicUrlData.publicUrl ? publicUrlData.publicUrl : imageUrl;
+                }
+            } catch (uploadErr) {
+                console.error('Image processing/upload error during update (non-fatal):', uploadErr && (uploadErr.stack || uploadErr.message || uploadErr));
+            }
         }
 
         const updateData = {
