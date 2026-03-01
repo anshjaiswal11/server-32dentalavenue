@@ -16,10 +16,27 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    console.warn("WARNING: Supabase URL or Key is missing. Blog features will not work.");
+    console.warn("WARNING: SUPABASE_URL or SUPABASE_KEY is missing. Blog features will not work.");
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Only create client when config is present to avoid runtime fetch failures
+let supabase = null;
+if (supabaseUrl && supabaseKey) {
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey);
+    } catch (err) {
+        console.error('Failed to initialise Supabase client', err && err.message ? err.message : err);
+        supabase = null;
+    }
+}
+
+function ensureSupabaseConfigured(res) {
+    if (!supabase) {
+        res.status(503).json({ message: 'Supabase not configured', error: 'SUPABASE_URL and/or SUPABASE_KEY are missing or invalid' });
+        return false;
+    }
+    return true;
+}
 
 // Multer Setup
 const storage = multer.memoryStorage();
@@ -40,6 +57,7 @@ const createSlug = (title) => {
 
 // GET / - List all blogs
 router.get('/', async (req, res) => {
+    if (!ensureSupabaseConfigured(res)) return;
     try {
         const { data, error } = await supabase
             .from('blogs')
@@ -50,12 +68,39 @@ router.get('/', async (req, res) => {
         res.json(data);
     } catch (err) {
         console.error("Error fetching blogs:", err);
-        res.status(500).json({ message: "Failed to fetch blogs", error: err.message });
+        const hint = err && err.message && err.message.includes('fetch failed') ? ' (network/fetch failure - check SUPABASE_URL and connectivity)' : '';
+        res.status(500).json({ message: "Failed to fetch blogs", error: (err && err.message) ? err.message + hint : 'Unknown error' });
     }
+});
+
+// GET /test - Return random test JSON for Postman/dev troubleshooting
+router.get('/test', (req, res) => {
+    const make = (i) => {
+        const id = Math.floor(Math.random() * 100000) + i;
+        const title = `Sample Blog ${id}`;
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+        const now = new Date(Date.now() - Math.floor(Math.random() * 1000 * 60 * 60 * 24 * 30));
+        return {
+            id,
+            title,
+            slug,
+            excerpt: `This is an automatically generated excerpt for ${title}.`,
+            content: `<p>${title} - generated content for testing purposes.</p>`,
+            image_url: `https://picsum.photos/seed/${id}/800/400`,
+            meta_title: `${title} - 32Dental Avenue`,
+            meta_description: `Meta for ${title}`,
+            created_at: now.toISOString()
+        };
+    };
+
+    const count = Number(req.query.count) || 3;
+    const items = Array.from({ length: Math.min(10, Math.max(1, count)) }, (_, i) => make(i));
+    res.json(items);
 });
 
 // GET /slug/:slug
 router.get('/slug/:slug', async (req, res) => {
+    if (!ensureSupabaseConfigured(res)) return;
     try {
         const { slug } = req.params;
         const { data, error } = await supabase
@@ -73,6 +118,7 @@ router.get('/slug/:slug', async (req, res) => {
 
 // GET /:id
 router.get('/:id', async (req, res) => {
+    if (!ensureSupabaseConfigured(res)) return;
     try {
         const { id } = req.params;
         const { data, error } = await supabase
@@ -84,12 +130,14 @@ router.get('/:id', async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (err) {
-        res.status(500).json({ message: "Failed to fetch blog", error: err.message });
+        const hint = err && err.message && err.message.includes('fetch failed') ? ' (fetch failed - possible network or missing SUPABASE config)' : '';
+        res.status(500).json({ message: "Failed to fetch blog", error: (err && err.message) ? err.message + hint : 'Unknown error' });
     }
 });
 
 // POST /
 router.post('/', upload.single('image'), async (req, res) => {
+    if (!ensureSupabaseConfigured(res)) return;
     try {
         const { title, content, meta_title, meta_description, slug: providedSlug } = req.body;
         const file = req.file;
@@ -147,6 +195,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 
 // PUT /:id
 router.put('/:id', upload.single('image'), async (req, res) => {
+    if (!ensureSupabaseConfigured(res)) return;
     try {
         const { id } = req.params;
         const { title, content, meta_title, meta_description, slug, image_url: existingImageUrl } = req.body;
@@ -201,6 +250,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 
 // DELETE /:id
 router.delete('/:id', async (req, res) => {
+    if (!ensureSupabaseConfigured(res)) return;
     try {
         const { id } = req.params;
         const { error } = await supabase
