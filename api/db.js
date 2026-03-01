@@ -16,6 +16,7 @@ if (typeof MONGODB_URI === 'string') {
 let isConnected = false;
 
 async function connect() {
+  // Return early if already connected
   if (isConnected || mongoose.connection.readyState === 1) {
     return mongoose;
   }
@@ -23,7 +24,11 @@ async function connect() {
   // Warn if using placeholder
   // Ensure MONGODB_URI is provided before calling string methods
   if (!MONGODB_URI) {
-    throw new Error('MONGODB_URI environment variable is not defined and no hardcoded URI found.');
+    throw new Error('MONGODB_URI environment variable is not set. Add it in Vercel → Settings → Environment Variables.');
+  }
+
+  if (MONGODB_URI.includes('<password>')) {
+    throw new Error('MONGODB_URI still contains the <password> placeholder. Replace it with your real password.');
   }
 
   // Warn if using placeholder
@@ -38,18 +43,15 @@ async function connect() {
 
   try {
     await mongoose.connect(MONGODB_URI, {
-      // Mongoose 7+ defaults are fine, removed deprecated options
       serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS || 5000),
       connectTimeoutMS: Number(process.env.MONGODB_CONNECT_TIMEOUT_MS || 10000),
     });
     isConnected = true;
-    console.log('MongoDB Connected Successfully');
+    console.log('✅ MongoDB Connected Successfully');
     return mongoose;
   } catch (err) {
     isConnected = false;
-    const hint = '\nHint: Check your MONGODB_URI in .env. Ensure your IP is whitelisted in Atlas.';
-    err.message = (err.message || '') + hint;
-    throw err;
+    throw new Error(`MongoDB connection failed: ${err.message}\n→ Check your MONGODB_URI and whitelist 0.0.0.0/0 in Atlas Network Access.`);
   }
 }
 
