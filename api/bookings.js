@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 
 function createTransport() {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST, 
+    host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT || 587),
     secure: process.env.SMTP_SECURE === 'true',
     auth: {

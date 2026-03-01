@@ -6,8 +6,9 @@ const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
+const router = express.Router();
 
-// Enable CORS for this handler
+// Enable CORS
 app.use(cors());
 
 // Supabase Client
@@ -20,11 +21,11 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Multer Setup (Memory Storage for image processing)
+// Multer Setup
 const storage = multer.memoryStorage();
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 } // Limit input to 5MB before compression
+    limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 // Helper to create slug
@@ -35,11 +36,10 @@ const createSlug = (title) => {
         .replace(/(^-|-$)+/g, '');
 };
 
-// Routes are defined directly on 'app' or a router mounted at root '/'
-// Because vercel rewrites /api/blogs -> api/blogs.js, the request path reaching here will appear as '/' or '/slug/...' if we mount at root.
+// --- Define Routes on Router ---
 
 // GET / - List all blogs
-app.get('/', async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('blogs')
@@ -47,7 +47,6 @@ app.get('/', async (req, res) => {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-
         res.json(data);
     } catch (err) {
         console.error("Error fetching blogs:", err);
@@ -55,9 +54,8 @@ app.get('/', async (req, res) => {
     }
 });
 
-// GET /slug/:slug - Get single blog by slug (Public)
-// IMPORTANT: Place this BEFORE /:id to avoid "slug" being interpreted as an ID
-app.get('/slug/:slug', async (req, res) => {
+// GET /slug/:slug
+router.get('/slug/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
         const { data, error } = await supabase
@@ -73,8 +71,8 @@ app.get('/slug/:slug', async (req, res) => {
     }
 });
 
-// GET /:id - Get single blog
-app.get('/:id', async (req, res) => {
+// GET /:id
+router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { data, error } = await supabase
@@ -90,8 +88,8 @@ app.get('/:id', async (req, res) => {
     }
 });
 
-// POST / - Create a new blog with image
-app.post('/', upload.single('image'), async (req, res) => {
+// POST /
+router.post('/', upload.single('image'), async (req, res) => {
     try {
         const { title, content, meta_title, meta_description, slug: providedSlug } = req.body;
         const file = req.file;
@@ -103,7 +101,6 @@ app.post('/', upload.single('image'), async (req, res) => {
         let imageUrl = null;
 
         if (file) {
-            // Compress image
             const compressedImageBuffer = await sharp(file.buffer)
                 .resize({ width: 1200, withoutEnlargement: true })
                 .jpeg({ quality: 80 })
@@ -124,9 +121,7 @@ app.post('/', upload.single('image'), async (req, res) => {
             imageUrl = publicUrlData.publicUrl;
         }
 
-        const slug = providedSlug && providedSlug.trim() !== ''
-            ? providedSlug
-            : createSlug(title);
+        const slug = providedSlug && providedSlug.trim() !== '' ? providedSlug : createSlug(title);
 
         const { data, error } = await supabase
             .from('blogs')
@@ -142,7 +137,6 @@ app.post('/', upload.single('image'), async (req, res) => {
             .select();
 
         if (error) throw error;
-
         res.status(201).json({ message: "Blog created successfully", blog: data[0] });
 
     } catch (err) {
@@ -151,8 +145,8 @@ app.post('/', upload.single('image'), async (req, res) => {
     }
 });
 
-// PUT /:id - Update a blog
-app.put('/:id', upload.single('image'), async (req, res) => {
+// PUT /:id
+router.put('/:id', upload.single('image'), async (req, res) => {
     try {
         const { id } = req.params;
         const { title, content, meta_title, meta_description, slug, image_url: existingImageUrl } = req.body;
@@ -188,7 +182,6 @@ app.put('/:id', upload.single('image'), async (req, res) => {
             meta_title,
             meta_description,
         };
-
         if (imageUrl) updateData.image_url = imageUrl;
 
         const { data, error } = await supabase
@@ -198,7 +191,6 @@ app.put('/:id', upload.single('image'), async (req, res) => {
             .select();
 
         if (error) throw error;
-
         res.json({ message: "Blog updated successfully", blog: data[0] });
 
     } catch (err) {
@@ -207,24 +199,36 @@ app.put('/:id', upload.single('image'), async (req, res) => {
     }
 });
 
-// DELETE /:id - Delete a blog
-app.delete('/:id', async (req, res) => {
+// DELETE /:id
+router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-
-        // Optionally delete image from storage if you want to clean up
         const { error } = await supabase
             .from('blogs')
             .delete()
             .eq('id', id);
 
         if (error) throw error;
-
         res.json({ message: "Blog deleted successfully" });
     } catch (err) {
         console.error("Error deleting blog:", err);
         res.status(500).json({ message: "Failed to delete blog", error: err.message });
     }
 });
+
+// --- Mount Router ---
+
+// Robust Middleware to handle Vercel's full path vs Local's stripped path
+app.use((req, res, next) => {
+    // If the request comes from Vercel, it might still have the /api/blogs prefix.
+    // We strip it so the router can match against relative paths (e.g., / or /slug/xyz).
+    if (req.url.startsWith('/api/blogs')) {
+        req.url = req.url.replace('/api/blogs', '') || '/';
+    }
+    next();
+});
+
+// Now, we can just mount the router at root, because req.url is normalized.
+app.use('/', router);
 
 module.exports = app;
