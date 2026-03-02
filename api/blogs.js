@@ -40,11 +40,24 @@ function ensureSupabaseConfigured(res) {
 
 // Unified Supabase error handler to return proper HTTP statuses and improved logs
 function handleSupabaseError(res, error, defaultMsg = 'Supabase error') {
-    console.error(defaultMsg + ':', error);
     const status = (error && (error.status || error.statusCode)) || 500;
     const message = (error && (error.message || error.msg)) || (typeof error === 'string' ? error : defaultMsg);
+    
+    console.error(`[ERROR] ${defaultMsg}`, {
+        httpStatus: status,
+        errorMessage: message,
+        errorCode: error && error.code,
+        errorDetails: error && error.details,
+        errorHint: error && error.hint,
+        fullError: error
+    });
+
     if (status === 401) {
-        return res.status(401).json({ message: 'Supabase authentication failed', error: message });
+        return res.status(401).json({ 
+            message: 'Supabase authentication failed (401)', 
+            error: message,
+            hint: 'Check that SUPABASE_KEY has correct permissions, or try using a service role key'
+        });
     }
     return res.status(status).json({ message: defaultMsg, error: message });
 }
@@ -65,6 +78,72 @@ const createSlug = (title) => {
 };
 
 // --- Define Routes on Router ---
+
+// DEBUG ENDPOINT: Check Supabase status and connection
+router.get('/debug/status', async (req, res) => {
+    const debug = {
+        timestamp: new Date().toISOString(),
+        supabaseUrlPresent: !!process.env.SUPABASE_URL,
+        supabaseKeyPresent: !!process.env.SUPABASE_KEY,
+        supabaseClientInitialized: !!supabase,
+        supabaseUrl: process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) + '...' : 'MISSING',
+        supabaseKeyPrefix: process.env.SUPABASE_KEY ? process.env.SUPABASE_KEY.substring(0, 20) + '...' : 'MISSING',
+    };
+
+    console.log('[DEBUG] Supabase Status:', JSON.stringify(debug, null, 2));
+
+    if (!supabase) {
+        return res.status(503).json({
+            message: 'Supabase NOT configured',
+            debug,
+            error: 'SUPABASE_URL and/or SUPABASE_KEY missing'
+        });
+    }
+
+    try {
+        // Try to fetch a single blog to test connection and auth
+        console.log('[DEBUG] Testing Supabase connection with a SELECT query...');
+        const { data, error } = await supabase
+            .from('blogs')
+            .select('id, title')
+            .limit(1);
+
+        if (error) {
+            console.error('[DEBUG] Supabase connection test FAILED:', error);
+            return res.status(error.status || 500).json({
+                message: 'Supabase connection test failed',
+                debug,
+                error: {
+                    status: error.status || error.statusCode,
+                    message: error.message,
+                    code: error.code,
+                    details: error.details,
+                    hint: error.hint
+                }
+            });
+        }
+
+        console.log('[DEBUG] Supabase connection test SUCCESS. Returned', data ? data.length : 0, 'records');
+        return res.status(200).json({
+            message: 'Supabase configured and connected successfully',
+            debug,
+            testResult: {
+                success: true,
+                dataFetched: data ? data.length : 0
+            }
+        });
+    } catch (err) {
+        console.error('[DEBUG] Exception during connection test:', err);
+        return res.status(500).json({
+            message: 'Exception during Supabase connection test',
+            debug,
+            error: {
+                message: err.message,
+                stack: err.stack
+            }
+        });
+    }
+});
 
 // GET / - List all blogs
 router.get('/', async (req, res) => {
@@ -148,18 +227,33 @@ router.get('/:id', async (req, res) => {
 
 // POST /
 router.post('/', upload.single('image'), async (req, res) => {
-    if (!ensureSupabaseConfigured(res)) return;
+    console.log('[POST /blogs] Request received', {
+        hasTitle: !!req.body.title,
+        hasContent: !!req.body.content,
+        hasFile: !!req.file,
+        supabaseClientExists: !!supabase
+    });
+
+    if (!ensureSupabaseConfigured(res)) {
+        console.error('[POST /blogs] Supabase not configured');
+        return;
+    }
+
     try {
         const { title, content, meta_title, meta_description, slug: providedSlug } = req.body;
         const file = req.file;
 
+        console.log('[POST /blogs] Validation check:', { title, content });
+
         if (!title || !content) {
+            console.warn('[POST /blogs] Missing required fields');
             return res.status(400).json({ message: "Title and content are required" });
         }
 
         let imageUrl = null;
 
         if (file) {
+            console.log('[POST /blogs] Processing image file...');
             try {
                 const compressedImageBuffer = await sharp(file.buffer)
                     .resize({ width: 1200, withoutEnlargement: true })
@@ -167,27 +261,45 @@ router.post('/', upload.single('image'), async (req, res) => {
                     .toBuffer();
 
                 const filename = `blog_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                console.log('[POST /blogs] Uploading image to Supabase storage:', filename);
 
                 const { error: uploadError } = await supabase.storage
                     .from('images')
                     .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
 
                 if (uploadError) {
-                    // Log with more detail and continue without failing the whole request
-                    console.error('Supabase storage upload failed (non-fatal), continuing without image:', uploadError);
+                    console.error('[POST /blogs] Supabase storage upload failed (non-fatal):', {
+                        status: uploadError.status,
+                        statusCode: uploadError.statusCode,
+                        message: uploadError.message,
+                        code: uploadError.code,
+                        details: uploadError.details,
+                        hint: uploadError.hint
+                    });
                 } else {
+                    console.log('[POST /blogs] Image uploaded successfully, getting public URL...');
                     const { data: publicUrlData } = await supabase.storage
                         .from('images')
                         .getPublicUrl(filename);
                     imageUrl = publicUrlData && publicUrlData.publicUrl ? publicUrlData.publicUrl : null;
+                    console.log('[POST /blogs] Public URL obtained:', imageUrl);
                 }
             } catch (uploadErr) {
-                console.error('Image processing/upload error (non-fatal):', uploadErr && (uploadErr.stack || uploadErr.message || uploadErr));
+                console.error('[POST /blogs] Image processing/upload error (non-fatal):', {
+                    message: uploadErr.message,
+                    stack: uploadErr.stack
+                });
                 // don't throw; allow blog creation without image
             }
         }
 
         const slug = providedSlug && providedSlug.trim() !== '' ? providedSlug : createSlug(title);
+
+        console.log('[POST /blogs] About to insert blog record into database:', {
+            title,
+            slug,
+            hasImageUrl: !!imageUrl
+        });
 
         const { data, error } = await supabase
             .from('blogs')
@@ -202,11 +314,26 @@ router.post('/', upload.single('image'), async (req, res) => {
             }])
             .select();
 
-        if (error) return handleSupabaseError(res, error, 'Failed to create blog');
+        if (error) {
+            console.error('[POST /blogs] Database insert FAILED with status', error.status || error.statusCode, ':', {
+                status: error.status || error.statusCode,
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint
+            });
+            return handleSupabaseError(res, error, 'Failed to create blog');
+        }
+
+        console.log('[POST /blogs] Blog created successfully:', data[0].id);
         res.status(201).json({ message: "Blog created successfully", blog: data[0] });
 
     } catch (err) {
-        console.error("Error creating blog:", err);
+        console.error("[POST /blogs] Unexpected error:", {
+            message: err.message,
+            stack: err.stack,
+            name: err.name
+        });
         res.status(500).json({ message: "Failed to create blog", error: err.message });
     }
 });
