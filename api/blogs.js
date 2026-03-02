@@ -38,6 +38,17 @@ function ensureSupabaseConfigured(res) {
     return true;
 }
 
+// Unified Supabase error handler to return proper HTTP statuses and improved logs
+function handleSupabaseError(res, error, defaultMsg = 'Supabase error') {
+    console.error(defaultMsg + ':', error);
+    const status = (error && (error.status || error.statusCode)) || 500;
+    const message = (error && (error.message || error.msg)) || (typeof error === 'string' ? error : defaultMsg);
+    if (status === 401) {
+        return res.status(401).json({ message: 'Supabase authentication failed', error: message });
+    }
+    return res.status(status).json({ message: defaultMsg, error: message });
+}
+
 // Multer Setup
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -64,7 +75,7 @@ router.get('/', async (req, res) => {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) return handleSupabaseError(res, error, 'Failed to fetch blogs');
         res.json(data);
     } catch (err) {
         console.error("Error fetching blogs:", err);
@@ -109,7 +120,7 @@ router.get('/slug/:slug', async (req, res) => {
             .eq('slug', slug)
             .single();
 
-        if (error) throw error;
+        if (error) return handleSupabaseError(res, error, 'Blog not found');
         res.json(data);
     } catch (err) {
         res.status(404).json({ message: "Blog not found", error: err.message });
@@ -127,7 +138,7 @@ router.get('/:id', async (req, res) => {
             .eq('id', id)
             .single();
 
-        if (error) throw error;
+        if (error) return handleSupabaseError(res, error, 'Failed to fetch blog');
         res.json(data);
     } catch (err) {
         const hint = err && err.message && err.message.includes('fetch failed') ? ' (fetch failed - possible network or missing SUPABASE config)' : '';
@@ -162,8 +173,8 @@ router.post('/', upload.single('image'), async (req, res) => {
                     .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
 
                 if (uploadError) {
-                    // Log and continue without failing the whole request
-                    console.error('Supabase storage upload failed, continuing without image:', uploadError);
+                    // Log with more detail and continue without failing the whole request
+                    console.error('Supabase storage upload failed (non-fatal), continuing without image:', uploadError);
                 } else {
                     const { data: publicUrlData } = await supabase.storage
                         .from('images')
@@ -191,7 +202,7 @@ router.post('/', upload.single('image'), async (req, res) => {
             }])
             .select();
 
-        if (error) throw error;
+        if (error) return handleSupabaseError(res, error, 'Failed to create blog');
         res.status(201).json({ message: "Blog created successfully", blog: data[0] });
 
     } catch (err) {
@@ -223,9 +234,9 @@ router.put('/:id', upload.single('image'), async (req, res) => {
                     .from('images')
                     .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
 
-                if (uploadError) {
-                    console.error('Supabase storage upload failed during update, continuing without updating image:', uploadError);
-                } else {
+                        if (uploadError) {
+                            console.error('Supabase storage upload failed during update (non-fatal), continuing without updating image:', uploadError);
+                        } else {
                     const { data: publicUrlData } = await supabase.storage
                         .from('images')
                         .getPublicUrl(filename);
@@ -251,7 +262,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
             .eq('id', id)
             .select();
 
-        if (error) throw error;
+        if (error) return handleSupabaseError(res, error, 'Failed to update blog');
         res.json({ message: "Blog updated successfully", blog: data[0] });
 
     } catch (err) {
@@ -270,7 +281,7 @@ router.delete('/:id', async (req, res) => {
             .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) return handleSupabaseError(res, error, 'Failed to delete blog');
         res.json({ message: "Blog deleted successfully" });
     } catch (err) {
         console.error("Error deleting blog:", err);
