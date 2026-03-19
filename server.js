@@ -4,6 +4,7 @@ require('dotenv').config();
 const cors = require('cors');
 const { connect } = require('./api/db');
 const bookingsHandler = require('./api/bookings');
+const contactHandler = require('./api/contact');
 const loginHandler = require('./api/login');
 const blogsRouter = require('./api/blogs');
 
@@ -64,6 +65,24 @@ async function startServer() {
   });
 
   app.use('/api/blogs', blogsRouter);
+
+  app.post('/api/contact', async (req, res) => {
+    try {
+      await contactHandler(req, res);
+    } catch (err) {
+      console.error('Contact POST error:', err);
+      res.status(500).json({ error: 'Server error', details: err.message });
+    }
+  });
+
+  app.get('/api/contact', async (req, res) => {
+    try {
+      await contactHandler(req, res);
+    } catch (err) {
+      console.error('Contact GET error:', err);
+      res.status(500).json({ error: 'Server error', details: err.message });
+    }
+  });
 
   // ✅ Health check now also reports DB status
   app.get('/health', (req, res) => res.json({ ok: true, db: 'connected' }));

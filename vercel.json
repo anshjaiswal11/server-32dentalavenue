@@ -16,6 +16,10 @@
       "dest": "/api/bookings.js"
     },
     {
+      "src": "^/api/contact$",
+      "dest": "/api/contact.js"
+    },
+    {
       "src": "^/api/health$",
       "dest": "/api/health.js"
     },
