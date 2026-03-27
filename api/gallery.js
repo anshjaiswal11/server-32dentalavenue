@@ -73,9 +73,21 @@ function verifyAdmin(req) {
 const _cors = require('./_cors');
 
 module.exports = async (req, res) => {
+  // Always set CORS headers first — even if something below crashes
   _cors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
+  try {
+    await handleRequest(req, res);
+  } catch (err) {
+    console.error('[gallery] Unhandled error:', err && (err.stack || err.message));
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error', detail: err && err.message });
+    }
+  }
+};
+
+async function handleRequest(req, res) {
   try {
     await connect();
   } catch (err) {
@@ -120,7 +132,7 @@ module.exports = async (req, res) => {
 
     // Check Cloudinary config
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-      return res.status(503).json({ error: 'Cloudinary not configured on server' });
+      return res.status(503).json({ error: 'Cloudinary not configured — add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET to Vercel environment variables' });
     }
 
     let publicId, imageUrl;
@@ -135,7 +147,6 @@ module.exports = async (req, res) => {
       const doc = await GalleryImage.create({ title, category, publicId, imageUrl });
       return res.status(201).json({ message: 'Image uploaded', image: doc });
     } catch (err) {
-      // If DB save fails, clean up Cloudinary
       try { await cloudinary.uploader.destroy(publicId); } catch (_) {}
       return res.status(500).json({ error: 'Failed to save image metadata' });
     }
@@ -147,7 +158,6 @@ module.exports = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Extract :id from URL — Vercel passes full URL
     const id = req.url.split('/').filter(Boolean).pop();
     if (!id || id === 'gallery') {
       return res.status(400).json({ error: 'Missing image id' });
@@ -157,7 +167,6 @@ module.exports = async (req, res) => {
       const doc = await GalleryImage.findById(id);
       if (!doc) return res.status(404).json({ error: 'Image not found' });
 
-      // Delete from Cloudinary
       try {
         await cloudinary.uploader.destroy(doc.publicId);
       } catch (err) {
@@ -173,4 +182,5 @@ module.exports = async (req, res) => {
 
   res.setHeader('Allow', 'GET, POST, DELETE, OPTIONS');
   res.status(405).end('Method Not Allowed');
-};
+}
+
