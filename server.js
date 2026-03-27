@@ -7,6 +7,7 @@ const bookingsHandler = require('./api/bookings');
 const contactHandler = require('./api/contact');
 const loginHandler = require('./api/login');
 const blogsRouter = require('./api/blogs');
+const galleryHandler = require('./api/gallery');
 
 const app = express();
 
@@ -55,6 +56,15 @@ async function startServer() {
     }
   });
 
+  app.delete('/api/bookings/:id', async (req, res) => {
+    try {
+      await bookingsHandler(req, res);
+    } catch (err) {
+      console.error('Bookings DELETE error:', err);
+      res.status(500).json({ error: 'Server error', details: err.message });
+    }
+  });
+
   app.post('/api/login', async (req, res) => {
     try {
       await loginHandler(req, res);
@@ -65,6 +75,31 @@ async function startServer() {
   });
 
   app.use('/api/blogs', blogsRouter);
+
+  // Gallery routes
+  app.get('/api/gallery', async (req, res) => {
+    try {
+      await galleryHandler(req, res);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error', details: err.message });
+    }
+  });
+
+  app.post('/api/gallery', async (req, res) => {
+    try {
+      await galleryHandler(req, res);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error', details: err.message });
+    }
+  });
+
+  app.delete('/api/gallery/:id', async (req, res) => {
+    try {
+      await galleryHandler(req, res);
+    } catch (err) {
+      res.status(500).json({ error: 'Server error', details: err.message });
+    }
+  });
 
   app.post('/api/contact', async (req, res) => {
     try {

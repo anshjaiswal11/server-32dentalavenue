@@ -117,7 +117,30 @@ module.exports = async (req, res) => {
       return res.json({ bookings: rows });
     }
 
-    res.setHeader('Allow', 'GET, POST, OPTIONS');
+    if (req.method === 'DELETE') {
+      // Admin-only: delete a booking by ID
+      const auth = req.headers.authorization;
+      if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+      const token = auth.slice(7);
+      try {
+        const payload = jwt.verify(token, JWT_SECRET);
+        if (!payload || payload.role !== 'admin') throw new Error('Invalid token');
+      } catch (err) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+
+      // Extract id from the URL tail
+      const id = (req.url || '').split('/').filter(Boolean).pop();
+      if (!id || id === 'bookings') {
+        return res.status(400).json({ error: 'Missing booking id' });
+      }
+
+      const deleted = await Booking.findByIdAndDelete(id);
+      if (!deleted) return res.status(404).json({ error: 'Booking not found' });
+      return res.json({ message: 'Booking deleted' });
+    }
+
+    res.setHeader('Allow', 'GET, POST, DELETE, OPTIONS');
     res.status(405).end('Method Not Allowed');
   } catch (err) {
     console.error('Bookings error', err && err.stack ? err.stack : err);

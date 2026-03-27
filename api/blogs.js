@@ -1,9 +1,38 @@
 const express = require('express');
 const multer = require('multer');
-const sharp = require('sharp');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const cloudinary = require('cloudinary').v2;
+const { Readable } = require('stream');
 require('dotenv').config();
+
+// Cloudinary config for blog image uploads
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Helper: upload buffer → Cloudinary, returns secure_url
+function uploadBufferToCloudinary(buffer, folder) {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                transformation: [{ fetch_format: 'auto', quality: 'auto', width: 1200, crop: 'limit' }],
+                resource_type: 'image',
+            },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url);
+            }
+        );
+        const readable = new Readable();
+        readable.push(buffer);
+        readable.push(null);
+        readable.pipe(stream);
+    });
+}
 
 const app = express();
 const router = express.Router();
@@ -253,42 +282,12 @@ router.post('/', upload.single('image'), async (req, res) => {
         let imageUrl = null;
 
         if (file) {
-            console.log('[POST /blogs] Processing image file...');
+            console.log('[POST /blogs] Uploading image to Cloudinary...');
             try {
-                const compressedImageBuffer = await sharp(file.buffer)
-                    .resize({ width: 1200, withoutEnlargement: true })
-                    .jpeg({ quality: 80 })
-                    .toBuffer();
-
-                const filename = `blog_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-                console.log('[POST /blogs] Uploading image to Supabase storage:', filename);
-
-                const { error: uploadError } = await supabase.storage
-                    .from('images')
-                    .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
-
-                if (uploadError) {
-                    console.error('[POST /blogs] Supabase storage upload failed (non-fatal):', {
-                        status: uploadError.status,
-                        statusCode: uploadError.statusCode,
-                        message: uploadError.message,
-                        code: uploadError.code,
-                        details: uploadError.details,
-                        hint: uploadError.hint
-                    });
-                } else {
-                    console.log('[POST /blogs] Image uploaded successfully, getting public URL...');
-                    const { data: publicUrlData } = await supabase.storage
-                        .from('images')
-                        .getPublicUrl(filename);
-                    imageUrl = publicUrlData && publicUrlData.publicUrl ? publicUrlData.publicUrl : null;
-                    console.log('[POST /blogs] Public URL obtained:', imageUrl);
-                }
+                imageUrl = await uploadBufferToCloudinary(file.buffer, 'blogs');
+                console.log('[POST /blogs] Cloudinary URL:', imageUrl);
             } catch (uploadErr) {
-                console.error('[POST /blogs] Image processing/upload error (non-fatal):', {
-                    message: uploadErr.message,
-                    stack: uploadErr.stack
-                });
+                console.error('[POST /blogs] Cloudinary upload failed (non-fatal):', uploadErr.message);
                 // don't throw; allow blog creation without image
             }
         }
@@ -350,27 +349,9 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 
         if (file) {
             try {
-                const compressedImageBuffer = await sharp(file.buffer)
-                    .resize({ width: 1200, withoutEnlargement: true })
-                    .jpeg({ quality: 80 })
-                    .toBuffer();
-
-                const filename = `blog_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-
-                const { error: uploadError } = await supabase.storage
-                    .from('images')
-                    .upload(filename, compressedImageBuffer, { contentType: 'image/jpeg' });
-
-                        if (uploadError) {
-                            console.error('Supabase storage upload failed during update (non-fatal), continuing without updating image:', uploadError);
-                        } else {
-                    const { data: publicUrlData } = await supabase.storage
-                        .from('images')
-                        .getPublicUrl(filename);
-                    imageUrl = publicUrlData && publicUrlData.publicUrl ? publicUrlData.publicUrl : imageUrl;
-                }
+                imageUrl = await uploadBufferToCloudinary(file.buffer, 'blogs');
             } catch (uploadErr) {
-                console.error('Image processing/upload error during update (non-fatal):', uploadErr && (uploadErr.stack || uploadErr.message || uploadErr));
+                console.error('Cloudinary upload failed during update (non-fatal):', uploadErr.message);
             }
         }
 

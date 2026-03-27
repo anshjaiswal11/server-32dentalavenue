@@ -16,8 +16,16 @@
       "dest": "/api/bookings.js"
     },
     {
+      "src": "^/api/bookings(?:/(.*))?$",
+      "dest": "/api/bookings.js"
+    },
+    {
       "src": "^/api/contact$",
       "dest": "/api/contact.js"
+    },
+    {
+      "src": "^/api/gallery(?:/(.*))?$",
+      "dest": "/api/gallery.js"
     },
     {
       "src": "^/api/health$",
